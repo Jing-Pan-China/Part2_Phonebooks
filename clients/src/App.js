@@ -1,53 +1,64 @@
-import { useState,useEffect } from 'react';
-import axios from 'axios'
+import { useState, useEffect, useMemo } from 'react';
+import PersonsService from './personsService';
 
 const App = () => {
   const [persons, setPersons] = useState([]);
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [searchName, setSearchName] = useState('');
+  const personsService = useMemo(() => new PersonsService(), [])
 
-  const hook=()=>{
-    axios
-      .get("http://localhost:3002/persons")
-      .then(response=>{
-        setPersons(response.data)
-        
-      })
-      }
+  useEffect(() => {
+    personsService
+      .getPersonsAsync()
+      .then((persons) => setPersons(persons))
+  }, [])
 
-    useEffect(hook, [])
-   
-
-  const handleSubmit = (event) => {
+  const handleCreate = async (event) => {
     event.preventDefault();
 
-    const isDuplicate = persons.some((person) => person.name === newName);
-
-    if (isDuplicate) {
-      alert(`${newName} already exists in the phonebook!`);
-      return;
+    // UPDATING
+    const oldPerson = persons.find((person) => person.name === newName);
+    if (!!oldPerson) {
+      const updatedPerson = {
+        ...oldPerson,
+        number: newNumber
+      }
+      await personsService.updatePersonAsync(updatedPerson)
+      const updatedPersons = persons.map((person) => {
+        if (person.name === newName) {
+          return {
+            ...person,
+            number: newNumber
+          }
+        }
+        return person
+      })
+      setPersons(updatedPersons)
+      return
     }
-
+  
+    // CREATING
     const newPerson = {
       name: newName,
       number: newNumber,
     };
+
+    await personsService.createPersonAsync(newPerson)
 
     setPersons([...persons, newPerson]);
     setNewName('');
     setNewNumber('');
   };
 
+  const handleDelete = async (personId) => {
+    await personsService.deletePersonByIdAsync(personId)
+    const newPersons = persons.filter((person) => person.id !== personId)
+    setPersons(newPersons);
+  }
+
   const handleChangeName = (event) => {
     const name = event.target.value;
-
-    const isDuplicate = persons.some((person) => person.name === name);
-
-    if (isDuplicate) {
-      alert(`${name} already exists in the phonebook!`);
-      return;
-    }
 
     setNewName(name);
   };
@@ -67,12 +78,12 @@ const App = () => {
 
   return (
     <div>
-      
+
       <div>
         <h1>Phonebook</h1>
         filter shown with: <input type="text" value={searchName} onChange={handleSearchChange} />
       </div>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleCreate}>
         <h1>add a new</h1>
         <div>
           name: <input type="text" value={newName} onChange={handleChangeName} />
@@ -81,20 +92,20 @@ const App = () => {
           number: <input type="text" value={newNumber} onChange={handleChangeNumber} />
         </div>
         <div>
-          <button type="submit">add</button>
+          <button type="submit" onSubmit={handleCreate}>add</button>
         </div>
       </form>
       <h2>Numbers</h2>
       <ul>
         {filteredPersons.map((person, index) => (
           <li key={index}>
-            {person.name} {person.number}
+            {person.name} {person.number} <button type="submit" onClick={async () => await handleDelete(person.id)}>delete</button>
           </li>
         ))}
       </ul>
     </div>
   );
-        };
+};
 
 export default App;
 
